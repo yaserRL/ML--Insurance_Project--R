@@ -1,9 +1,8 @@
-Predicting Customer Claims
-
+Predicting Customer Claims:
 This repository contains a comprehensive case study on building a predictive model to estimate the total number of claims a customer might file with an insurance company. The project involves data cleaning, descriptive analysis, feature engineering, and model building using statistical and machine learning techniques.
 
-Project Structure
 
+Project Structure:
 Data Preparation: The dataset is preprocessed by cleaning, transforming, and encoding features. Missing values are handled, and numerical variables are normalized.
 
 Descriptive Statistics: Insights into the dataset are extracted through various statistical measures and visualizations.
