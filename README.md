@@ -3,6 +3,7 @@ This repository contains a comprehensive case study on building a predictive mod
 
 
 Project Structure:
+
 Data Preparation: The dataset is preprocessed by cleaning, transforming, and encoding features. Missing values are handled, and numerical variables are normalized.
 
 Descriptive Statistics: Insights into the dataset are extracted through various statistical measures and visualizations.
@@ -22,3 +23,14 @@ Insights:
 Features such as areacode, discount, and vehicle_age have significant predictive power.
 
 Certain regions and vehicle brands exhibit unique trends in claim counts.
+
+
+Dependencies:
+
+This project relies on the following R packages:
+
+Data Processing: dplyr, magrittr, reshape2
+
+Visualization: ggplot2, ggcorrplot
+
+Statistical Modeling: stats, psych, arm
