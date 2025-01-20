@@ -1,0 +1,357 @@
+---
+title: "Detail_descriptions"
+author: "Rajib Kumar De"
+date: "May 21, 2019"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#memory clear
+rm(list = ls()) 
+
+# Loading Packages
+library("stats") # To get all statistical function in r
+library("arm") # Data Analysis Using Regression and Multilevel/Hierarchical Models
+library("jtools")
+library("broom") # For tidy data frames
+library("ggstance") # horizontal versions of common ggplot2 Geoms etc.
+library("magrittr") # Offers set of operators to improve the code
+library("reshape2") # ransform data between wide and long formats
+library("ggplot2") # For proper visualizations
+library("ggcorrplot") # Visualize correlation matrix
+```
+
+```{r}
+# To import out dataset into r
+mdata.input <- read.csv2("Data.csv", sep = ",", check.names = F, dec = '.')
+mdata <- mdata.input
+```
+
+```{r}
+### Descriptive statistics
+ls.str(mdata) # To identify the type of the variables
+hist(mdata$claim_count, breaks = 50) # Histogram plot of Claim_count
+mean(mdata$claim_count) 
+var(mdata$claim_count) 
+table(mdata$claim_count) # Unique count of total claims
+```
+
+```{r}
+### univariate analysis -- it is the simplest form of analysing data and it's major purpose is to describe- it takes data, summarizes that data and finds patterns in the data.
+
+library(psych)
+describe(mdata)
+```
+
+```{r}
+### Data preparation/cleaning
+
+# Remove 'policy_desc' column
+mdata <- mdata[,!(names(mdata) %in% c('policy_desc'))]
+
+# Renaming variables for our covenient purpose
+names(mdata)[names(mdata) == "ï»¿policy_desc"] <- "policy_desc"
+names(mdata)[names(mdata) == "cat_areacode"] <- "areacode"
+names(mdata)[names(mdata) == "num_vehicleAge"] <- "vehicle_age"
+names(mdata)[names(mdata) == "num_noClaimDiscountPercent"] <- "discount"
+names(mdata)[names(mdata) == "cat_carBrand"] <- "car_brand"
+names(mdata)[names(mdata) == "num_populationDensitykmsq"] <- "population_density"
+names(mdata)[names(mdata) == "cat_Region"] <- "region"
+names(mdata)[names(mdata) == "ord_vehicleHP"] <- "vehicle_hp"
+names(mdata)[names(mdata) == "num_exposure"] <- "exposure"
+names(mdata)[names(mdata) == "cat_fuelType"] <- "fuel_type"
+names(mdata)[names(mdata) == "num_driverAge"] <- "driver_age"
+
+# Change type of variable 'exposure'
+mdata$exposure <- suppressWarnings(as.numeric(as.character(mdata$exposure)))
+
+# Remove rows with missing values
+any(!complete.cases(mdata))
+mdata <- mdata[complete.cases(mdata), ]
+
+# Remove rows where variable 'fuel_type' is NULL
+mdata <- mdata[-which(mdata[,'fuel_type'] == 'NULL'), ]
+
+```
+
+```{r}
+######################   CORRELATION ###########################
+
+# Here we are using spearman rank correlation to find the relationship between within variables. Below are description of spearman correlation like why, when we can use this and what are assumptions in this correlation.
+
+# When should you use the Spearman's rank-order correlation?
+
+# The Spearman's rank-order correlation is the nonparametric version of the Pearson product-moment correlation. Spearman's correlation coefficient, (??, also signified by rs) measures the strength and direction of association between two ranked variables.
+
+# What are the assumptions of the test?
+
+# You need two variables that are either ordinal(variables that have two or more categories like "Type of property""), interval or ratio(Continuous variables can be further categorized as either interval or ratio variables. Ex. temperature measured in degrees Celsius or Fahrenheit, temperature measured in Kelvin)
+
+# What is a monotonic relationship?
+
+# A monotonic relationship is a relationship that does one of the following: (1) as the value of one variable increases, so does the value of the other variable; or (2) as the value of one variable increases, the other variable value decreases.
+
+# Why is a monotonic relationship important to Spearman's correlation?
+
+# Spearman's correlation measures the strength and direction of monotonic association between two variables. Monotonicity is "less restrictive" than that of a linear relationship.
+
+cor.names <- c("spearman")
+
+cor.df <- mdata[,!(names(mdata) %in% c('policy_desc'))]
+cor.df <- lapply(cor.df, as.numeric) %>% data.frame()
+
+# calculating correlation
+
+for (i in cor.names) {
+  all.cor <- cor(cor.df, use = 'complete.obs', method = i)
+  assign(paste0("cor.", i), melt(cor(cor.df, use = 'complete.obs'), variable.factor=FALSE))
+}
+
+
+################## Correlogram #########################
+
+# What is a Correlation Matrix?
+
+# A correlation matrix is a table showing correlation coefficients between sets of variables. Each random variable (Xi) in the table is correlated with each of the other values in the table (Xj). This allows you to see which pairs have the highest correlation.
+
+# What Kind of Data Can I Compare?
+
+# The correlation matrix is simply a table of correlations. The most common correlation coefficient is Pearson's correlation coefficient, which compares two interval variables or ratio variables. But there are many others, depending on the type of data you want to correlate. 
+
+corr <- round(all.cor, 2)
+
+pdf(file="Correlogram.pdf",width = 16, height = 12)
+corr.plot1 <- ggcorrplot(corr, hc.order = TRUE, 
+                         type = "lower", 
+                         lab = TRUE, 
+                         lab_size = 3, 
+                         method="square", 
+                         colors = c("tomato2", "white", "springgreen3"), 
+                         title="Correlogram", 
+                         ggtheme=theme_bw)
+print(corr.plot1) 
+dev.off()
+
+# Here the correlation matrix has been plotted using all the  variables
+# From the graph, It is seen that Area code and population density have highest correlation  which is equals to 0.98
+
+# Also driver age and discount have negative correlation which id equals to 0.57
+
+```
+
+```{r}
+################## MODELLING  ##########################
+
+# Here we are considering these four below mentioned statistics for modelling.
+
+# RSE -- In statistics, a relative standard error (RSE) is equal to the standard error of a survey estimate divided by the survey estimate and then multiplied by 100. The number is multiplied by 100 so it can be expressed as a percentage. The RSE does not necessarily represent any new information beyond the standard error, but it might be a superior method of presenting statistical confidence.
+
+# Relative Standard Error vs. Standard Error
+# Standard error measures how much a survey estimate is likely to deviate from the actual population. It is expressed as a number. By contrast, relative standard error (RSE) is the standard error expressed as a fraction of the estimate and is usually displayed as a percentage. Estimates with a RSE of 25% or greater are subject to high sampling error and should be used with caution.
+
+# What Is the Adjusted R-squared?
+
+# The adjusted R-squared compares the explanatory power of regression models that contain different numbers of predictors.
+
+# Suppose you compare a five-predictor model with a higher R-squared to a one-predictor model. Does the five predictor model have a higher R-squared because it's better? Or is the R-squared higher because it has more predictors? Simply compare the adjusted R-squared values to find out!
+
+# The adjusted R-squared is a modified version of R-squared that has been adjusted for the number of predictors in the model. The adjusted R-squared increases only if the new term improves the model more than would be expected by chance. It decreases when a predictor improves the model by less than expected by chance. The adjusted R-squared can be negative, but it's usually not.  It is always lower than the R-squared.
+
+# What are F-statistics and the F-test?
+
+# F-tests are named after its test statistic, F, which was named in honor of Sir Ronald Fisher. The F-statistic is simply a ratio of two variances. Variances are a measure of dispersion, or how far the data are scattered from the mean. Larger values represent greater dispersion.
+
+
+model.stat <- matrix(0, ncol = 4, nrow = 1) %>% data.frame()
+names(model.stat) <- c('RSE', 'Adjusted R-squared', 'F-Statistic', 'any-aliased')
+
+# convert areacode character variable to integer variable to pass in model
+mdata$areacode <- factor(mdata$areacode, levels=c("A","B","C","D","E","F"), labels=c(1,2,3,4,5,6))
+mdata$areacode=as.integer(as.character(mdata$areacode ))
+
+# convert fuel_type character variable to integer variable to pass in model
+mdata$fuel_type <- factor(mdata$fuel_type, levels=c("NULL","Diesel", "Regular", "Electric"), labels=c(0,1,2,3))
+mdata$fuel_type=as.integer(as.character(mdata$fuel_type))
+```
+
+```{r}
+########### Sampling ############
+
+# Sampling (0.7 , 0.3) 
+
+# Why do we set seed in R?
+
+# Set the seed of R's random number generator, which is useful for creating simulations or random objects that can be reproduced. The random numbers are the same, and they would continue to be the same no matter how far out in the sequence we went
+
+set.seed(1234)
+ind<- sample(2, nrow(mdata), replace=TRUE, prob=c(0.8,0.2))
+
+# Divinng dataset into trian and test 
+trainData=mdata[ind==1,]
+testData=mdata[ind==2,]
+
+
+########################### LINEAR MODEL ##############################
+
+# LIBEAR REGRESSION: - In statistical modeling, it is used to estimate real world values (price of items, height and weight etc.) based on continuous variable(s). Here, we want to establish relationship between independent and dependent variables by fitting a best line. This best fit line is known as regression line and represented by a linear equation Y= a *X + b.
+
+# Technically, a regression analysis model is based on the sum of squares, which is a mathematical way to find the dispersion of data points.  The goal of a model is to get the smallest possible sum of squares and draw a line that comes closest to the data.
+# In this equation:
+# Y - Dependent Variable a - Slope  X - Independent variable b - Intercept
+# These coefficients a and b are derived based on minimizing the sum of squared difference of distance between data points and regression line.
+
+# In statistics, they differentiate between a simple and multiple linear regressions. Simple Linear Regression models the relationship between a dependent variable and one independent variables using a linear function. If you use two or more explanatory variables to predict the independent variable, you deal with multiple linear regression. If the dependent variables are modeled as a non-linear function because the data relationships do not follow a straight line, use non-linear regression instead. While finding best fit line, you can fit a polynomial or curvilinear regression. And these are known as polynomial or curvilinear regression.
+
+# Assumptions of Linear Rgression
+
+# First, linear regression needs the relationship between the independent and dependent variables to be linear.  It is also important to check for outliers since linear regression is sensitive to outlier effects.  The linearity assumption can best be tested with scatter plots, the following two examples depict two cases, where no and little linearity is present.
+
+# Secondly, the linear regression analysis requires all variables to be multivariate normal.  This assumption can best be checked with a histogram or a Q-Q-Plot.  Normality can be checked with a goodness of fit test, e.g., the Kolmogorov-Smirnov test.
+
+# Thirdly, linear regression assumes that there is little or no multicollinearity in the data.  Multicollinearity occurs when the independent variables are too highly correlated with each other.
+
+# Multicollinearity may be tested with three central criteria:
+
+# 1) Correlation matrix - when computing the matrix of Pearson's Bivariate Correlation among all independent variables the correlation coefficients need to be smaller than 1.
+
+# 2) Tolerance - the tolerance measures the influence of one independent variable on all other independent variables; the tolerance is calculated with an initial linear regression analysis.  Tolerance is defined as T = 1 - R² for these first step regression analysis.  With T < 0.1 there might be multicollinearity in the data and with T < 0.01 there certainly is.
+
+# 3) Variance Inflation Factor (VIF) - the variance inflation factor of the linear regression is defined as VIF = 1/T. With VIF > 10 there is an indication that multicollinearity may be present; with VIF > 100 there is certainly multicollinearity among the variables.
+
+# Why do we use Linear Regression?
+
+# Simple linear regression is useful for finding relationship between two continuous variables. One is predictor or independent variable and other is response or dependent variable. ... The best fit line is the one for which total prediction error (all data points) are as small as possible.
+
+# MODEL 1
+measurevar <- "claim_count"
+lm.regressors1 <- setdiff(names(trainData), c('claim_count'))
+
+# These are the necessary independent variables for modelling
+f1 <- as.formula(paste(measurevar, paste(lm.regressors1, collapse=" + "), sep=" ~ "))
+#as.formula(paste(measurevar, paste(groupvars, collapse=" + "), sep=" ~ "))
+fit1 <- lm(f1, data = trainData)
+summary(fit1)
+model.stat.fit1 <-  model.stat
+model.stat.fit1$RSE <- summary(fit1)$sigma
+model.stat.fit1$`Adjusted R-squared` <- summary(fit1)$adj.r.squared
+model.stat.fit1$`F-Statistic` <- summary(fit1)$fstatistic[1]
+model.stat.fit1$`any-aliased` <- any(summary(fit1)$aliased)
+
+# MODEL 2
+lm.regressors2 <- setdiff(names(trainData), c('claim_count', 'region', 'car_brand', 'vehicle_hp'))
+f2 <- as.formula(paste("claim_count ~ ", paste(lm.regressors2, collapse=" + ")))
+fit2 <- lm(f2, data = trainData)
+summary(fit2) # higher F-Statistic shows stronger relashionship between exogenic and endogenic variables
+model.stat.fit2 <-  model.stat
+model.stat.fit2$RSE <- summary(fit2)$sigma
+model.stat.fit2$`Adjusted R-squared` <- summary(fit2)$adj.r.squared
+model.stat.fit2$`F-Statistic` <- summary(fit2)$fstatistic[1]
+model.stat.fit2$`any-aliased` <- any(summary(fit2)$aliased)
+
+# Interpretation
+
+# From the above table we can see that the value of Multiple R-squared =  0.03047
+# R-squared value measures the proportion of the variation in the dependent variable explained by all of the independent variables in the model. Thus a high R-squared values signifies that the model is agood fit.
+
+# From the table we can also see that the value of Adjusted R-squared = 0.03039 
+# Adjusted R-squared value measures the proportion of variation explained by only those independent variables that really affect the dependent variable. It penalizes you for adding independent variable that does not affect the dependent variable.
+# Thus again higher the value of Adjusted R-squared the better is the model.
+
+# Thep-value< 2.2e-16(which is p-value<0.05, it means that the null hypothesis is rejected and the alternative hypothesis gets accepted).Herethe null hypothesis that is the dependent and independent variables are not linearly related is rejected.
+
+# Residual standard error = 0.237, it explains how close the actual data points are to the model's predicted values. It measures standard deviation of the residuals.
+
+############### See Predicted Value
+pred = predict(fit1,testData)
+
+#See Actual vs. Predicted Value
+finaldata = cbind(testData,pred)
+print(head(subset(finaldata, select = c(claim_count,pred))))
+
+#Calculating RMSE
+rmse <- sqrt(mean((testData$claim_count - pred)^2))
+print(rmse)
+
+#check accuracy
+library(forecast)
+accuracy(fit1)
+
+```
+
+```{r}
+######################### Poisson regression #######################
+
+# Why would you do a Poisson regression?
+
+# Poisson regression, also known as a log-linear model, is what you use when your outcome variable is a count (i.e., numeric, but not quite so wide in range as a continuous variable.) Examples of count variables in research include how many heart attacks or strokes one's had, how many days in the past month one's used.he Poisson distribution is unique in that its mean and its variance are equal. This is often due to zero inflation.
+
+# ASSUMPTIONS
+
+# 1. Your dependent variable consists of count data. Count data is different to the data measured in other well-known types of regression.
+
+#2. You have one or more independent variables, which can be measured on a continuous, ordinal or nominal/dichotomous scale. Ordinal and nominal/dichotomous variables can be broadly classified as categorical variables. 
+
+# 3. You should have independence of observations. This means that each observation is independent of the other observations; that is, one observation cannot provide any information on another observation. 
+
+# 4. The distribution of counts (conditional on the model) follow a Poisson distribution. One consequence of this is that the observed and expected counts should be equal 
+
+# 5. The mean and variance of the model are identical. This is a consequence of Assumption #4; that there is a Poisson distribution. For a Poisson distribution the variance has the same value as the mean. If you satisfy this assumption you have equidispersion. However, often this is not the case and your data is either under- or overdispersed with overdispersion the more common problem. There are a variety of methods that you can use to assess overdispersion. One method is to assess the Pearson dispersion statistic.
+
+
+# MODEL 3
+set.seed(3464)
+pr.regressors3 <- setdiff(names(trainData), c('claim_count'))
+f3 <- as.formula(paste("claim_count ~ ", paste(pr.regressors3, collapse=" + ")))
+fit3 <- glm(f3, trainData, family = poisson(link = "log"))
+summary(fit3)
+
+# MODEL 4
+set.seed(3423)
+pr.regressors4 <- setdiff(names(trainData), c('claim_count', 'region', 'car_brand', 'vehicle_hp', 'fuel_type'))
+f4 <- as.formula(paste("claim_count ~ ", paste(pr.regressors4, collapse=" + ")))
+fit4 <- glm(f4, trainData, family = quasipoisson(link = "log"))
+summary(fit4)
+
+
+#See Predicted Value
+pred = predict(fit3,testData)
+
+#See Actual vs. Predicted Value
+finaldata = cbind(testData,pred)
+print(head(subset(finaldata, select = c(claim_count,pred))))
+
+#Calculating RMSE
+rmse <- sqrt(mean((testData$claim_count - pred)^2))
+print(rmse)
+
+#check accuracy
+library(forecast)
+accuracy(fit3)
+
+# Comparing The Models
+coef1 = coef(fit3)
+coef2 = coef(fit4)
+se.coef1 = se.coef(fit3)
+se.coef2 = se.coef(fit4)
+models.both <- cbind(coef1, se.coef1, coef2, se.coef2, exponent=exp(coef1))
+models.both
+
+# Comparing The Models
+coef3 = coef(fit1)
+coef4 = coef(fit2)
+se.coef3 = se.coef(fit1)
+se.coef4 = se.coef(fit2)
+models.both <- cbind(coef1, se.coef1, coef2, se.coef2, coef3, se.coef4, coef3, se.coef4, exponent=exp(coef1))
+models.both
+
+# Final Interpretation:
+
+# Root Mean Square Error (RMSE) measures how much error there is between two data sets. In other words, it compares a predicted value and an observed or known value. Here we can see that the RSME value is also quite low for Poisson Regression Model(0.2352745) as compare to Linear Regression(0.2369978). So our final model is poisson regression.
+```
+
